@@ -3,14 +3,16 @@ const WebSocket = require("ws");
 
 const PORT = process.env.PORT || 10000;
 
-// HTTP server (THIS IS CRITICAL)
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { "Content-Type": "text/plain" });
-  res.end("WebSocket server is running");
-});
+const server = http.createServer();
 
-// WebSocket attached to HTTP server
-const wss = new WebSocket.Server({ server });
+// IMPORTANT: let ws handle ONLY websocket upgrades
+const wss = new WebSocket.Server({ noServer: true });
+
+server.on("upgrade", (req, socket, head) => {
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    wss.emit("connection", ws, req);
+  });
+});
 
 wss.on("connection", (ws) => {
   console.log("Client connected");
@@ -18,7 +20,6 @@ wss.on("connection", (ws) => {
   ws.on("message", (msg) => {
     console.log("Received:", msg.toString());
 
-    // broadcast
     wss.clients.forEach(client => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(msg.toString());
@@ -27,6 +28,13 @@ wss.on("connection", (ws) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log("WebSocket server running on port", PORT);
+// Optional: simple HTTP response for browser
+server.on("request", (req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("OK");
 });
+
+server.listen(PORT, () => {
+  console.log("Server listening on port", PORT);
+});
+
